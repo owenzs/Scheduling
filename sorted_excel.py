@@ -25,3 +25,7 @@ try:
 
 except Exception as e:
     print(f"❌ 发生错误：{e}")
+
+#1. 出现null 报错，让用户澄清
+#2. 数据库连接层，product code连接2表，然后把parent code拿出来
+#3.
