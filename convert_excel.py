@@ -1,18 +1,47 @@
 import pandas as pd
+import logging
+import hashlib
+import os
 
-excel_path = "test_data.xlsx"
-output_csv_path = "preview_first_sheet.csv"
-preview_rows = 100  # 可自定义你要提取多少行
+from log_part import log_info, log_error
 
-try:
-    print(f"正在从 {excel_path} 中提取第一个 sheet 前 {preview_rows} 行...")
+HASH_FILE = "excel_hash.txt"
 
-    # 只读取第一个 sheet 的前 N 行
-    df = pd.read_excel(excel_path, sheet_name=0, nrows=preview_rows)
+def compute_excel_hash(excel_path: str) -> str:
+    """读取整个 Excel 内容并返回其哈希值"""
+    try:
+        df = pd.read_excel(excel_path, sheet_name=0)
+        content_bytes = df.to_csv(index=False).encode("utf-8")
+        return hashlib.md5(content_bytes).hexdigest()
+    except Exception as e:
+        log_error(f"❌ 计算哈希失败：{e}")
+        raise
 
-    # 保存为 CSV 文件
-    df.to_csv(output_csv_path, index=False, encoding="utf-8-sig")
-    print(f"✅ 提取成功，已保存到 {output_csv_path}，你可以用 Excel 或文本编辑器打开查看。")
+def load_previous_hash() -> str:
+    if os.path.exists(HASH_FILE):
+        with open(HASH_FILE, "r") as f:
+            return f.read().strip()
+    return ""
 
-except Exception as e:
-    print(f"❌ 出现错误：{e}")
+def save_hash(hash_str: str):
+    with open(HASH_FILE, "w") as f:
+        f.write(hash_str)
+
+def convert_excel_main(excel_path: str, output_csv_path: str):
+    try:
+        current_hash = compute_excel_hash(excel_path)
+        previous_hash = load_previous_hash()
+
+        if current_hash == previous_hash:
+            log_info("🟡 文件未变化，跳过转换步骤")
+            return
+
+        log_info(f"📥 Excel 有更新，重新读取并转换：{excel_path}")
+        df = pd.read_excel(excel_path, sheet_name=0)
+        df.to_csv(output_csv_path, index=False, encoding="utf-8-sig")
+        save_hash(current_hash)
+        log_info(f"✅ 转换成功，保存为：{output_csv_path}")
+
+    except Exception as e:
+        log_error(f"❌ Excel 读取或转换失败：{e}")
+        raise
